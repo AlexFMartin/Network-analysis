@@ -335,6 +335,9 @@ df.paper2.complete <- df.paper2.complete %>%
   )
 # print sample size 
 sum(!is.na(df.paper2.complete$cidB2677))
+
+rm(df.paper2.father)
+rm(df.paper2.mother)
 ```
 
 ## Check and impute missing
@@ -453,8 +456,8 @@ df.paper2.complete <- df.paper2.complete %>%
   select(
     # participant ID
     cidB2677,
-    # child sex
-    kz021,
+    # covariates (child sex; household social class)
+    kz021, houseSC,
     # SDQ subscale scores, factor score, items
     SDQ_emo9_imp, SDQ_emo11_imp, SDQ_emo13_imp, emotional_symptoms, 
     ta7002, ta7007, ta7012, ta7015, ta7023, ku682, ku687, ku692, ku695, ku703, kw6502, kw6507, kw6512, kw6515, kw6523,
@@ -465,7 +468,7 @@ df.paper2.complete <- df.paper2.complete %>%
   )
 ```
 
-## Action needed
+## ACTION NEEDED
 ```{r}
 # Run or load bootstraps
 # If running bootstraps use T, if loading saved bootstraps use F
@@ -825,6 +828,12 @@ print(paste0("Child sex: "))
 table(df.paper2.subY$kz021)
 table(df.paper2.subN$kz021)
 chiSquare(kz021 ~ subsample, data = df.paper2)
+
+# Household social class (highest reported mother or father)
+print(paste0("Social class: "))
+table(df.paper2.subY$houseSC)
+table(df.paper2.subN$houseSC)
+chiSquare(houseSC ~ subsample, data = df.paper2)
 
 rm(df.paper2)
 rm(df.paper2.subY)
