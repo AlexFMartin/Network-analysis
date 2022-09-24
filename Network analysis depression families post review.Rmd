@@ -1,0 +1,1673 @@
+---
+title: "Network analysis"
+author: "Alex Martin"
+date: "02/09/2022"
+output: html_document
+---
+
+This version includes changes requested by reviewers at the British Journal of Psychiatry.
+
+R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
+
+Helpful code for finding help for things:
+> class(Bridge_SS3)
+[1] "bridge"
+> ?plot.bridge
+> ?bridge
+igraph::plot.
+
+```{r}
+# citation for R
+citation()
+
+# r version
+v <- R.Version()
+print(v)
+```
+
+# Code for Network Analysis Project to Detect Bridge Edges (based on code provided by Deniz)
+
+# 0. Set up
+
+## Data set up
+```{r}
+# Install libraries
+
+if(!require(foreign)) {
+  install.packages("foreign")
+  library(foreign)
+}
+#print citation
+citation("foreign")
+
+if(!require(rio)) {
+  install.packages("rio")
+  library(rio)
+}
+#print citation
+citation("rio")
+
+if(!require(devtools)) {
+  install.packages("devtools")
+  library(devtools)
+}
+#print citation
+citation("devtools")
+
+if(!require(bootnet)) {
+  install.packages("bootnet")
+  library(bootnet)
+}
+#print citation
+citation("bootnet")
+
+if(!require(qgraph)) {
+  install.packages("qgraph")
+  library(qgraph)
+}
+#print citation
+citation("qgraph")
+
+if(!require(psychonetrics)) {
+  install.packages("psychonetrics")
+  library(psychonetrics)
+}
+#print citation
+citation("psychonetrics")
+# psychonetrics FIML - full information maximum likelihood 
+
+if(!require(igraph)) {
+  install.packages("igraph")
+  library(igraph)
+}
+#print citation
+citation("igraph")
+
+if(!require(networktools)) {
+  install.packages("networktools")
+  library(networktools)
+}
+#print citation
+citation("networktools")
+
+if(!require(tidyverse)) {
+  install.packages("tidyverse")
+  library(tidyverse)
+}
+#print citation
+citation("tidyverse")
+
+if(!require(labelled)) {
+  install.packages("labelled")
+  library(labelled)
+}
+#print citation
+citation("labelled")
+
+if(!require(haven)) {
+  install.packages("haven")
+  library(haven)
+}
+#print citation
+citation("haven")
+
+# LSR (Cohen's d)
+if(!require(lsr)) {
+  install.packages("lsr")
+  library(lsr)
+}
+# print citation
+citation("lsr")
+
+# Hmisc (chi square)
+if(!require(Hmisc)) {
+  install.packages("Hmisc")
+  library(Hmisc)
+}
+# print citation
+citation("Hmisc")
+
+# Hmisc (chi square)
+if(!require(Hmisc)) {
+  install.packages("Hmisc")
+  library(Hmisc)
+}
+# print citation
+citation("Hmisc")
+
+# Mice (imputation)
+if(!require(mice)) {
+  install.packages("mice")
+  library(mice)
+}
+# print citation
+citation("mice")
+
+# Lavaan (CFA)
+if(!require(lavaan)) {
+  install.packages("lavaan")
+  library(lavaan)
+}
+#print citation
+citation("lavaan")
+
+# VIM (graphs in mice)
+if(!require(VIM)) {
+  install.packages("VIM")
+  library(VIM)
+}
+#print citation
+citation("VIM")
+
+# psy (Cronbach's alpha)
+if(!require(psy)) {
+  install.packages("psy")
+  library(psy)
+}
+#print citation
+citation("psy")
+
+# REdaS (KMO)
+if(!require(REdaS)) {
+  install.packages("REdaS")
+  library(REdaS)
+}
+#print citation
+citation("REdaS")
+
+# NetworkComparisonTest (split half reliability)
+if(!require(NetworkComparisonTest)) {
+  install.packages("NetworkComparisonTest")
+  library(NetworkComparisonTest)
+}
+#print citation
+citation("NetworkComparisonTest")
+
+# DescTools (descriptives inc confidence intervals)
+if(!require(DescTools)) {
+  install.packages("DescTools")
+  library(DescTools)
+}
+#print citation
+citation("DescTools")
+
+# Checkpoint (Run checkpoint for reproducible results)
+if(!require(checkpoint)) {
+  install.packages("checkpoint")
+  library(checkpoint)
+}
+#print citation
+citation("checkpoint")
+
+#checkpoint(
+#  snapshotDate = "2022-09-02",
+#  R.version = "4.1.0",
+#  checkpointLocation = tempdir() #only useful when running the checkpoint 
+#)
+
+# Pull data 
+df.paper2 <- read_spss("/Users/Alex/Desktop/OneDrive - King's College London/PhD/Paper 2 network analysis/Network models/Data/Final for import DO NOT MOVE/Parent psychopathology network data.sav")
+```
+
+## Subset by complete data
+```{r}
+# Step 1 subset by complete SDQ data at first timepoint (age 9)
+
+df.paper2.complete <- df.paper2 %>%
+  # only include those who have complete data for the following
+  filter(
+    !is.na(SDQ_emo9))
+
+# print sample size
+sum(!is.na(df.paper2.complete$cidB2677))
+```
+
+
+```{r}
+# Step 2 subset by complete mother and father data
+
+# Ns for mother
+df.paper2.mother <- df.paper2.complete %>%
+  # calculate number of missing cases for mother and father
+  mutate(
+    mMiss = 
+      is.na(m1y_funny) +
+      is.na(m1y_enjoy) +
+      is.na(m1y_blame) +
+      is.na(m1y_worry) +
+      is.na(m1y_panic) +
+      is.na(m1y_onTop) +
+      is.na(m1y_sleep) +
+      is.na(m1y_sad) +
+      is.na(m1y_cry) +
+      is.na(m1y_sHarm)
+  ) %>%
+  # rows: keep cases which are less than 2
+  filter(
+    mMiss < 2
+  ) %>%
+  # columns: drop the variables we created from the data frame
+  select(
+    -mMiss
+  )
+sum(!is.na(df.paper2.complete$cidB2677))
+
+# Ns for fathers
+df.paper2.father <- df.paper2.complete %>%
+  # calculate number of missing cases for mother and father
+  mutate(
+    dMiss = 
+      is.na(d1y_funny) +
+      is.na(d1y_enjoy) +
+      is.na(d1y_blame) +
+      is.na(d1y_worry) +
+      is.na(d1y_panic) +
+      is.na(d1y_onTop) +
+      is.na(d1y_sleep) +
+      is.na(d1y_sad) +
+      is.na(d1y_cry) +
+      is.na(d1y_sHarm),
+  ) %>%
+  # rows: keep cases which are less than 2
+  filter(
+    dMiss < 2
+  ) %>%
+  # columns: drop the variables we created from the data frame
+  select(
+    -dMiss,
+  )
+sum(!is.na(df.paper2.complete$cidB2677))
+
+df.paper2.complete <- df.paper2.complete %>%
+  # calculate number of missing cases for mother and father
+  mutate(
+    dMiss = 
+      is.na(d1y_funny) +
+      is.na(d1y_enjoy) +
+      is.na(d1y_blame) +
+      is.na(d1y_worry) +
+      is.na(d1y_panic) +
+      is.na(d1y_onTop) +
+      is.na(d1y_sleep) +
+      is.na(d1y_sad) +
+      is.na(d1y_cry) +
+      is.na(d1y_sHarm),
+    mMiss = 
+      is.na(m1y_funny) +
+      is.na(m1y_enjoy) +
+      is.na(m1y_blame) +
+      is.na(m1y_worry) +
+      is.na(m1y_panic) +
+      is.na(m1y_onTop) +
+      is.na(m1y_sleep) +
+      is.na(m1y_sad) +
+      is.na(m1y_cry) +
+      is.na(m1y_sHarm)
+  ) %>%
+  # rows: keep cases which are less than 2 missing
+  filter(
+    dMiss < 2 &
+    mMiss < 2
+  ) %>%
+  # columns: drop the variables we created from the data frame
+  select(
+    -dMiss,
+    -mMiss
+  )
+# print sample size
+sum(!is.na(df.paper2.complete$cidB2677))
+
+rm(df.paper2.father)
+rm(df.paper2.mother)
+```
+
+## ED latent factor
+```{r}
+# transform variables to numeric
+df.paper2.complete <- df.paper2.complete %>%
+    mutate(
+        SDQ_emo9 = as.numeric(SDQ_emo9),
+        SDQ_emo11 = as.numeric(SDQ_emo11),
+        SDQ_emo13 = as.numeric(SDQ_emo13)
+    )
+# correlation matrix for ED at each time point (9, 11, 13 years)
+df.cor <- df.paper2.complete %>%
+  select(cidB2677, SDQ_emo9, SDQ_emo11, SDQ_emo13)
+# print matrix
+round(cor(df.cor[ , 2:4], use = "complete.obs"), 2)
+```
+
+### - Impute missing
+https://datascienceplus.com/imputing-missing-data-with-r-mice-package/
+```{r}
+# check Ns and data is as it should be
+str(df.cor)
+# Ns missing
+Nmissing <- sapply(df.cor, function(x) sum(is.na(x)))
+print(paste0("N missing: ", Nmissing))
+# Props missing (columns and rows)
+pMiss <- function(x){sum(is.na(x))/length(x)*100}
+apply(df.cor,2,pMiss)
+apply(df.cor,1,pMiss)
+# Missing pattern
+md.pattern(df.cor)
+pdf("missing data pattern.pdf", width = 10)
+aggr_plot <- aggr(df.cor, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE)
+```
+
+```{r}
+# impute
+tempData <- mice(df.cor, m=5, meth="pmm", predM = c("cidB2677" = 0))
+summary(tempData)
+completedData <- complete(tempData,1)
+
+pdf("missing data scatter plot")
+xyplot(tempData, SDQ_emo11 ~ SDQ_emo13, pch=18, cex=1)
+dev.off()
+
+pdf("missing data density plot.pdf")
+densityplot(tempData)
+dev.off()
+
+pdf("missing data strip plot.pdf")
+stripplot(tempData, pch = 20, cex = 1.2)
+dev.off()
+
+# rename variables and merge to original data frame
+completedData$SDQ_emo9_imp <- completedData$SDQ_emo9
+completedData$SDQ_emo11_imp <- completedData$SDQ_emo11
+completedData$SDQ_emo13_imp <- completedData$SDQ_emo13
+completedData <- completedData[ , c("cidB2677", "SDQ_emo9_imp", "SDQ_emo11_imp", "SDQ_emo13_imp")]
+df.paper2.complete <- full_join(df.paper2.complete, completedData, by = "cidB2677")
+```
+
+```{r}
+## Check assumptions for factor analysis
+
+# rerun correlation matrix for ED at each time point (9, 11, 13 years)
+df.cor2 <- df.paper2.complete %>%
+  select(cidB2677, SDQ_emo9_imp, SDQ_emo11_imp, SDQ_emo13_imp)
+# print matrix
+round(cor(df.cor2[ , 2:4], use = "complete.obs"), 2)
+# KMO
+df.kmos <- df.cor2 %>%
+  select(SDQ_emo9_imp, SDQ_emo11_imp, SDQ_emo13_imp)
+KMOS(df.kmos)
+```
+
+### - CFA
+```{r}
+# Run CFA
+# one factor three items, default marker method
+CFA1  <- ' emotional_symptoms  =~ SDQ_emo9_imp + SDQ_emo11_imp + SDQ_emo13_imp '
+fit <- cfa(CFA1, data = df.paper2.complete) 
+summary(fit, fit.measures = TRUE) 
+
+# predict factor scores
+head(lavPredict(fit, method = "regression", label = TRUE))
+# merge factor scores to the data.frame
+idx <- lavInspect(fit, "case.idx")
+fscores <- lavPredict(fit)
+## loop over factors
+for (fs in colnames(fscores)) {
+  df.paper2.complete[idx, fs] <- fscores[ , fs]
+}
+summary(df.paper2.complete$emotional_symptoms)
+
+# print sample size
+sum(!is.na(df.paper2.complete$emotional_symptoms))
+```
+
+
+## Include variables
+```{r}
+# Rename symptoms neatly for network
+df.paper2.complete$m_funny <- df.paper2.complete$m1y_funny
+df.paper2.complete$m_anhedonia <- df.paper2.complete$m1y_enjoy
+df.paper2.complete$m_guilt <- df.paper2.complete$m1y_blame
+df.paper2.complete$m_worry <- df.paper2.complete$m1y_worry
+df.paper2.complete$m_panic <- df.paper2.complete$m1y_panic
+df.paper2.complete$m_overwhelm <- df.paper2.complete$m1y_onTop
+df.paper2.complete$m_insomnia <- df.paper2.complete$m1y_sleep
+df.paper2.complete$m_sadness <- df.paper2.complete$m1y_sad
+df.paper2.complete$m_crying <- df.paper2.complete$m1y_cry
+df.paper2.complete$m_harmIdeas <- df.paper2.complete$m1y_sHarm
+
+df.paper2.complete$d_funny <- df.paper2.complete$d1y_funny
+df.paper2.complete$d_anhedonia <- df.paper2.complete$d1y_enjoy
+df.paper2.complete$d_guilt <- df.paper2.complete$d1y_blame
+df.paper2.complete$d_worry <- df.paper2.complete$d1y_worry
+df.paper2.complete$d_panic <- df.paper2.complete$d1y_panic
+df.paper2.complete$d_overwhelm <- df.paper2.complete$d1y_onTop
+df.paper2.complete$d_insomnia <- df.paper2.complete$d1y_sleep
+df.paper2.complete$d_sadness <- df.paper2.complete$d1y_sad
+df.paper2.complete$d_crying <- df.paper2.complete$d1y_cry
+df.paper2.complete$d_harmIdeas <- df.paper2.complete$d1y_sHarm
+
+# select variables to include in the data frame for analysis
+df.paper2.complete <- df.paper2.complete %>% 
+  select(
+    cidB2677,
+    kz021,
+    SDQ_emo9_imp, SDQ_emo11_imp, SDQ_emo13_imp, emotional_symptoms,
+    ta7002, ta7007, ta7012, ta7015, ta7023, 
+    ku682, ku687, ku692, ku695, ku703, kw6502, kw6507, kw6512, kw6515, kw6523,
+    pe290, g290, houseSC,
+    starts_with("m_"), 
+    starts_with("d_"),
+  )
+```
+
+## ACTION NEEDED
+```{r}
+# Run or load bootstraps
+# If running bootstraps use T, if loading saved bootstraps use F
+runBootstraps <- T
+
+# specify which data to run
+df.data <- df.paper2.complete
+```
+
+
+
+# 1. Data reduction
+## All variables network
+To check whether overlapping pairs of symptoms can be removed we want to check whether they are important within the 'whole' network
+
+### - Select symptoms
+```{r}
+# all potential nodes
+df.dep3 <- df.data[, c("m_funny", "m_anhedonia", "m_guilt", "m_worry", "m_panic", "m_overwhelm", "m_insomnia", "m_sadness", "m_crying", "m_harmIdeas", "d_funny", "d_anhedonia", "d_guilt", "d_worry", "d_panic", "d_overwhelm", "d_insomnia", "d_sadness", "d_crying", "d_harmIdeas", "emotional_symptoms")]
+```
+
+```{r}
+# run the model
+network3 <- estimateNetwork(df.dep3,
+                            default = "ggmModSelect", 
+                            corMethod ="cor", 
+                            corArgs = list(method = "spearman"),
+                            stepwise = TRUE,
+                            sig = "0.05")
+# plot the graph
+depgr3 <- plot(network3,
+               edge.labels=TRUE) 
+```
+
+### - Centrality indices
+```{r, eval = FALSE}
+# Investigate the stability of centrality indices: these are case-dropping subset bootstraps
+
+# Name the file
+bootstrapFile5 <- "dep all vars casedropping Bootstrapped Centrality Indices List with communities (bootCI all vars).RData"
+
+# If you want to run bootstraps or load data (command in 1.1)
+if (runBootstraps) {
+  # If bridge statistics are to be bootstrapped, the communities argument should be provided
+  bootCI3 <- bootnet(network3, nBoots = 1000, type = "case", nCores = 8, statistics="all", communities = c(rep("Mother",10), rep("Father",10), rep("Child outcome",1)))
+  # save the bootstrap results to be able to use them in the future
+    save(bootCI3, file = bootstrapFile5) 
+} else {
+  # load the bootstrap results back using this command when already run.
+  load("dep all vars casedropping Bootstrapped Centrality Indices List with communities (bootCI3).RData")
+}
+
+stability_dep3 <- corStability(bootCI3)
+stability_dep3
+
+pdf("dep all vars stability full index.pdf")
+plot(bootCI3, 
+     statistics = c("strength",  "closeness", "betweenness", "expectedInfluence", "bridgeStrength",  "bridgeCloseness", "bridgeBetweenness", "bridgeExpectedInfluence")) 
+
+
+pdf("dep all vars centrality for interpretation.pdf")
+Centralitydep3 <- centrality(network3, all.shortest.paths = TRUE)
+centralityPlot(network3,
+               scale = c("raw0"),
+               include = c("Strength", "Closeness"),
+               orderBy="Strength")
+
+# Raw strength centrality
+CentValues <- round(centrality(network3)$OutDegree,2)
+write.table(CentValues, file="dep all vars CentValues.csv", col.names = FALSE)
+
+# Standardized strength centrality
+Strengthstan <- centralityPlot(network3)
+StrengthstanTable <- Strengthstan$data[,c(3,5)]
+StrengthstanTable[,2] <- round(StrengthstanTable[,2],2)
+write.table(StrengthstanTable, file="dep all vars CentValuesstan.csv", row.names=FALSE)
+```
+
+### - Bridge centrality indices
+```{r, eval = FALSE}
+Bridge_SS3 = bridge(depgr3, communities=c( "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "2", "2", "2", "2", "2", "2", "2", "2", "2", "2", "3"), 
+                   useCommunities = "all",
+                   directed = NULL, nodes = NULL)
+summary(Bridge_SS3)
+
+pdf("dep all vars Bridge centrality for interpretation.pdf", width = 8)
+plot(Bridge_SS3, 
+     include=c("Bridge Strength", "Bridge Closeness"),
+     order="value", 
+     zscore=TRUE)
+dev.off()
+
+# plot graph in a way that the nodes are colored according to their Bridge Centrality Indices
+
+community_structuredep3 <- c(rep("Mother", 10), rep("Father", 10), rep("Child outcome", 1))
+
+bridge_centralitydep3 <- bridge(network3$graph, communities = community_structuredep3)
+bridge_centralitydep3
+save(bridge_centralitydep3, file="dep all vars Bridge Centrality Values.csv")
+
+# detect the top 30% scoring nodes on bridge expected influence centrality index 
+# set probs= as required
+bridge_expinf_dep3 <- bridge_centralitydep3$`Bridge Expected Influence (1-step)`
+
+top_bridgesdep3 <- names(bridge_expinf_dep3[bridge_expinf_dep3 > quantile(bridge_expinf_dep3, probs=0.7, na.rm=TRUE)])
+
+bridge_num_3 <- which(names(bridge_expinf_dep3) %in% top_bridgesdep3)
+new_communitiesdep3 <- vector()
+for(i in 1:length(bridge_expinf_dep3)) {
+  if(i %in% bridge_num_3) {
+    new_communitiesdep3[i] <- "Bridge"
+  } else {new_communitiesdep3[i] <- community_structuredep3[i]}
+}
+```
+
+### - Bridge symptoms and communities graph
+```{r, eval = FALSE}
+#plot the graph that shows the bridge symptoms and the communities:
+pdf("dep all vars Theoretical Communities Bridge Expected Influence Nodes Graph.pdf")
+plot(network3, 
+     layout="spring", 
+     groups=new_communitiesdep3,
+     color=c("orange", "lightgreen", "lightblue", "pink", "red"),
+     edge.labels=FALSE
+     )
+dev.off()
+```
+
+## Select symptoms
+```{r}
+# only select the nodes you want to include for step 1 (depression symptoms between parents)
+df.dep <- df.data %>%
+  select(starts_with("d_"), starts_with("m_"))
+```
+
+```{r}
+# run the model
+network1 <- estimateNetwork(df.dep, 
+                            default = "ggmModSelect", 
+                            corMethod ="cor", 
+                            corArgs = list(method = "spearman"),
+                            stepwise = TRUE,
+                            sig = "0.05"
+                            )
+
+# plot the graph for step 1
+depgr <- plot(network1, 
+              edge.labels=TRUE) 
+```
+
+## Remove redundant nodes
+```{r}
+###### adjust p and correlation threshold as required ########
+gb_df.dep <- goldbricker(df.dep, p = 0.001, threshold = 0.3)
+gb_df.dep
+
+#gb_df.dep$proportion_matrix
+# run PCA scores
+#df.dep_reduced <- net_reduce(data=df.dep, badpairs=gb_df.dep)
+#df.dep_reduced
+
+# drop the redundant variables
+df.data <- df.data[ , c("cidB2677", "m_anhedonia", "m_guilt", "m_worry", "m_panic", "m_overwhelm", "m_insomnia", "m_sadness", "m_crying", "m_harmIdeas", "d_anhedonia", "d_guilt", "d_worry", "d_panic", "d_overwhelm", "d_insomnia", "d_sadness", "d_crying", "d_harmIdeas", "emotional_symptoms")]
+
+# Full variable list: 
+# df.data <- df.paper2.complete[ , c("m_funny", "m_anhedonia", "m_guilt", "m_worry", "m_panic", "m_overwhelm", "m_insomnia", "m_sadness", "m_crying", "m_harmIdeas", "d_funny", "d_anhedonia", "d_guilt", "d_worry", "d_panic", "d_overwhelm", "d_insomnia", "d_sadness", "d_crying", "d_harmIdeas", "emotional_symptoms")]
+```
+
+
+```{r}
+# run the model
+network1 <- estimateNetwork(df.data, 
+                            default = "ggmModSelect", 
+                            corMethod ="cor", 
+                            corArgs = list(method = "spearman"),
+                            stepwise = TRUE,
+                            sig = "0.05"
+                            )
+
+# plot the graph for step 1
+depgr <- plot(network1, 
+              edge.labels=TRUE) 
+```
+
+
+# 2. Descriptives
+
+Check the ranges and NAs, means and CIs
+```{r}
+# mothers
+summary(df.paper2.complete[ ,"m_funny"])
+CI <- MeanCI(df.paper2.complete$m_funny, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$m_funny)
+
+summary(df.paper2.complete[ ,"m_anhedonia"])
+CI <- MeanCI(df.paper2.complete$m_anhedonia, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$m_anhedonia)
+
+summary(df.paper2.complete[ ,"m_guilt"])
+CI <- MeanCI(df.paper2.complete$m_guilt, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$m_guilt)
+
+summary(df.paper2.complete[ ,"m_worry"])
+CI <- MeanCI(df.paper2.complete$m_worry, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$m_worry)
+
+summary(df.paper2.complete[ ,"m_panic"])
+CI <- MeanCI(df.paper2.complete$m_panic, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$m_panic)
+
+summary(df.paper2.complete[ ,"m_overwhelm"])
+CI <- MeanCI(df.paper2.complete$m_overwhelm, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$m_overwhelm)
+
+summary(df.paper2.complete[ ,"m_insomnia"])
+CI <- MeanCI(df.paper2.complete$m_insomnia, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$m_insomnia)
+
+summary(df.paper2.complete[ ,"m_sadness"])
+CI <- MeanCI(df.paper2.complete$m_sadness, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$m_sadness)
+
+summary(df.paper2.complete[ ,"m_crying"])
+CI <- MeanCI(df.paper2.complete$m_crying, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$m_crying)
+
+summary(df.paper2.complete[ ,"m_harmIdeas"])
+CI <- MeanCI(df.paper2.complete$m_harmIdeas, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$m_harmIdeas)
+```
+
+```{r}
+# fathers
+summary(df.paper2.complete[ ,"d_funny"])
+CI <- MeanCI(df.paper2.complete$d_funny, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$d_funny)
+
+summary(df.paper2.complete[ ,"d_anhedonia"])
+CI <- MeanCI(df.paper2.complete$d_anhedonia, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$d_anhedonia)
+
+summary(df.paper2.complete[ ,"d_guilt"])
+CI <- MeanCI(df.paper2.complete$d_guilt, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$d_guilt)
+
+summary(df.paper2.complete[ ,"d_worry"])
+CI <- MeanCI(df.paper2.complete$d_worry, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$d_worry)
+
+summary(df.paper2.complete[ ,"d_panic"])
+CI <- MeanCI(df.paper2.complete$d_panic, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$d_panic)
+
+summary(df.paper2.complete[ ,"d_overwhelm"])
+CI <- MeanCI(df.paper2.complete$d_overwhelm, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$d_overwhelm)
+
+summary(df.paper2.complete[ ,"d_insomnia"])
+CI <- MeanCI(df.paper2.complete$d_insomnia, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$d_insomnia)
+
+summary(df.paper2.complete[ ,"d_sadness"])
+CI <- MeanCI(df.paper2.complete$d_sadness, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$d_sadness)
+
+summary(df.paper2.complete[ ,"d_crying"])
+CI <- MeanCI(df.paper2.complete$d_crying, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$d_crying)
+
+summary(df.paper2.complete[ ,"d_harmIdeas"])
+CI <- MeanCI(df.paper2.complete$d_harmIdeas, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+table(df.paper2.complete$d_harmIdeas)
+```
+
+```{r}
+# Child outcome
+summary(df.paper2.complete[ ,"emotional_symptoms"])
+CI <- MeanCI(df.paper2.complete$emotional_symptoms, ci = 0.95, na.rm = TRUE)
+print(round(CI, 2))
+```
+
+```{r}
+# demographics
+table(df.paper2.complete$houseSC)
+```
+
+
+### reliability
+```{r}
+### Child emotional difficulties at age 9
+# create dataframe
+df.alphaChild <- df.paper2.complete %>%
+  select(ku682, ku687, ku692, ku695, ku703)
+# correlation matrix
+round(cor(df.alphaChild, use = "complete.obs"), 2)
+# alpha
+cronbach(df.alphaChild)
+
+### Child emotional difficulties at age 11
+# create dataframe
+df.alphaChild1 <- df.paper2.complete %>%
+  select(kw6502, kw6507, kw6512, kw6515, kw6523)
+# correlation matrix
+round(cor(df.alphaChild1, use = "complete.obs"), 2)
+# alpha
+cronbach(df.alphaChild1)
+
+### Child emotional difficulties at age 11
+# create dataframe
+df.alphaChild2 <- df.paper2.complete %>%
+  select(ta7002, ta7007, ta7012, ta7015, ta7023)
+# correlation matrix
+round(cor(df.alphaChild2, use = "complete.obs"), 2)
+# alpha
+cronbach(df.alphaChild2)
+
+### mother depression 21 months
+# create dataframe
+df.alphamother <- df.paper2.complete %>%
+  select(m_funny, m_anhedonia, m_guilt, m_worry, m_panic, m_overwhelm, m_insomnia, m_sadness, m_crying, m_harmIdeas)
+# print correlation matrix
+round(cor(df.alphamother, use = "complete.obs"), 2)
+# print alpha
+cronbach(df.alphamother)
+
+### father depression 21 months
+# create dataframe
+df.alphafather <- df.paper2.complete %>%
+  select(d_funny, d_anhedonia, d_guilt, d_worry, d_panic, d_overwhelm, d_insomnia, d_sadness, d_crying, d_harmIdeas)
+# print correlation matrix
+round(cor(df.alphafather, use = "complete.obs"), 2)
+# print alpha
+cronbach(df.alphafather)
+
+rm(df.alphaChild)
+rm(df.alphaChild1)
+rm(df.alphaChild2)
+rm(df.alphamother)
+rm(df.alphafather)
+```
+
+
+## subsample vs excluded
+
+Create variable y/n subgroup
+```{r}
+# create new variable which contains whether participant is in the subsample y/n
+df.paper2$subsample <- as.numeric(df.paper2$cidB2677 %in% df.paper2.complete$cidB2677)
+# assign variable label
+attr(df.paper2$subsample, 'label') <- "is participant part of subsample 1 = yes"
+
+# Stratify by whether the participant is in the subsample for analysis or not
+df.paper2.subY <- df.paper2[which(df.paper2$subsample == 1), ]
+df.paper2.subN <- df.paper2[which(df.paper2$subsample == 0), ]
+
+# print sample size
+sum(!is.na(df.paper2.subY$cidB2677))
+sum(!is.na(df.paper2.subN$cidB2677))
+```
+
+```{r}
+# father EPDS total score
+summary(df.paper2.subY[ ,"pe290"])
+SD <- sd(df.paper2.subY$pe290, na.rm = TRUE)
+print(paste0("SD pe290: ", round(SD, 2)))
+
+summary(df.paper2.subN[ ,"pe290"])
+SD <- sd(df.paper2.subN$pe290, na.rm = TRUE)
+print(paste0("SD pe290: ", round(SD, 2)))
+
+ttest <- t.test(pe290 ~ subsample, data = df.paper2)
+d <- cohensD(pe290 ~ subsample,
+        data = df.paper2)
+ttest
+print(d)
+
+# mother EPDS total score
+summary(df.paper2.subY[ ,"g290"])
+SD <- sd(df.paper2.subY$g290, na.rm = TRUE)
+print(paste0("SD g290: ", round(SD, 2)))
+
+summary(df.paper2.subN[ ,"g290"])
+SD <- sd(df.paper2.subN$g290, na.rm = TRUE)
+print(paste0("SD g290: ", round(SD, 2)))
+
+ttest <- t.test(g290 ~ subsample, data = df.paper2)
+d <- cohensD(g290 ~ subsample,
+        data = df.paper2)
+ttest
+print(d)
+
+# Child SDQ ED score at age 9 (first sample constraint)
+summary(df.paper2.subY[ ,"SDQ_emo9"])
+SD <- sd(df.paper2.subY$SDQ_emo9, na.rm = TRUE)
+print(paste0("SD SDQ_emo9: ", round(SD, 2)))
+
+summary(df.paper2.subN[ ,"SDQ_emo9"])
+SD <- sd(df.paper2.subN$SDQ_emo9, na.rm = TRUE)
+print(paste0("SD SDQ_emo9: ", round(SD, 2)))
+
+ttest <- t.test(SDQ_emo9 ~ subsample, data = df.paper2)
+d <- cohensD(SDQ_emo9 ~ subsample,
+        data = df.paper2)
+ttest
+print(d)
+
+# Child sex (girls = 2)
+print(paste0("Child sex: "))
+table(df.paper2.subY$kz021)
+table(df.paper2.subN$kz021)
+chiSquare(kz021 ~ subsample, data = df.paper2)
+
+# Household social class (highest reported mother or father)
+print(paste0("Social class: "))
+table(df.paper2.subY$houseSC)
+table(df.paper2.subN$houseSC)
+chiSquare(houseSC ~ subsample, data = df.paper2)
+
+#rm(df.paper2)
+#rm(df.paper2.subY)
+#rm(df.paper2.subN)
+```
+
+
+# 3. Step-1 mother and father symptoms
+
+## Select symptoms
+```{r}
+# only select the nodes you want to include for step 1 (depression symptoms between parents)
+df.dep <- df.data %>%
+  select(starts_with("m_"), starts_with("d_"))
+```
+
+```{r}
+# run the model (significant edges only)
+network1 <- estimateNetwork(df.dep, 
+                            default = "ggmModSelect", 
+                            corMethod ="cor", 
+                            corArgs = list(method = "spearman"),
+                            stepwise = TRUE,
+                            sig = "0.05"
+                            )
+# plot the graph for step 1
+depgr <- plot(network1, 
+              edge.labels=TRUE) 
+print(network1)
+```
+
+```{r}
+# run the model (including significant and non-significant edges)
+network1all <- estimateNetwork(df.dep, 
+                            default = "ggmModSelect", 
+                            corMethod ="cor", 
+                            corArgs = list(method = "spearman"),
+                            stepwise = TRUE
+                            )
+# plot the graph for step 1
+pdf("dep 1 network with correlations and all edges.pdf")
+depgr <- plot(network1all, 
+              edge.labels=TRUE) 
+```
+
+## Centrality indices
+```{r}
+# Investigate the stability of centrality indices: these are case-dropping subset bootstraps
+
+# Name the file
+bootstrapFile1 <- "dep 1 casedropping Bootstrapped Centrality Indices List with communities (bootCI1).RData"
+
+# If you want to run bootstraps or load data (command in 1.1)
+if (runBootstraps) {
+  # If bridge statistics are to be bootstrapped, the communities argument should be provided
+  bootCI1 <- bootnet(network1, nBoots = 1000, type = "case", nCores = 8, statistics="all", communities = c(rep("Mother",9), rep("Father",9)))
+  # save the bootstrap results to be able to use them in the future without having to run it for hours again.
+  save(bootCI1, file = bootstrapFile1) 
+} else {
+  # load the bootstrap results back when the bootstrap data is already saved.
+  load(bootstrapFile1)
+}
+
+stability_dep1 <- corStability(bootCI1) #I advise to save the results in a word doc.
+stability_dep1
+
+pdf("dep 1 stability full index.pdf")
+plot(bootCI1, 
+     statistics = c("strength",  "closeness", "betweenness", "expectedInfluence", "bridgeStrength",  "bridgeCloseness", "bridgeBetweenness", "bridgeExpectedInfluence")) 
+
+# only report and interpret those which meet the stability criteria
+pdf("dep 1 centrality for interpretation 0.25.pdf", width = 7)
+Centralitydep <- centrality(network1, all.shortest.paths = TRUE)
+centralityPlot(network1, 
+               scale = c("raw0"),
+               include = c("Strength", "Closeness", "Betweenness"), 
+               orderBy="Strength")
+
+# Raw strength centrality
+CentValues <- round(centrality(network1)$OutDegree,2)
+write.table(CentValues, file="dep 1 CentValues.csv", col.names = FALSE)
+
+# Standardized strength centrality
+Strengthstan <- centralityPlot(network1)
+StrengthstanTable <- Strengthstan$data[,c(3,5)]
+StrengthstanTable[,2] <- round(StrengthstanTable[,2],2)
+write.table(StrengthstanTable, file="dep 1 CentValuesstan.csv", row.names=FALSE)
+```
+
+
+## Bridge centrality indices
+```{r}
+Bridge_SS = bridge(depgr, communities=c( "1", "1", "1", "1", "1", "1", "1", "1", "1", "2", "2", "2", "2", "2", "2", "2", "2", "2"), 
+                   useCommunities = "all",
+                   directed = NULL, nodes = NULL)
+summary(Bridge_SS)
+
+# only report and interpret those which meet the stability criteria
+pdf("dep 1 bridge centrality for interpretation 0.25.pdf", width = 5.5)
+plot(Bridge_SS, 
+     include = c("Bridge Strength", "Bridge Betweenness"), 
+     order="value", 
+     zscore=FALSE)
+dev.off()
+
+# plot graph in a way that the nodes are colored according to their Bridge Centrality Indices
+community_structuredep <- c(rep("Mother", 9), rep("Father", 9))
+bridge_centralitydep <- bridge(network1$graph, communities=community_structuredep)
+bridge_centralitydep
+save(bridge_centralitydep,file="dep 1 Bridge Centrality Values.csv")
+
+# detect the top x% scoring nodes on bridge expected influence centrality index 
+bridge_expinf_dep <- bridge_centralitydep$`Bridge Expected Influence (1-step)`
+
+# set threshold for bridges
+top_bridgesdep <- names(bridge_expinf_dep[bridge_expinf_dep>quantile(bridge_expinf_dep, probs=0.70, na.rm=TRUE)])
+
+bridge_num_1 <- which(names(bridge_expinf_dep) %in% top_bridgesdep)
+new_communitiesdep <- vector()
+for(i in 1:length(bridge_expinf_dep)) {
+  if(i %in% bridge_num_1) {
+    new_communitiesdep[i] <- "Bridge"
+  } else {new_communitiesdep[i] <- community_structuredep[i]}
+}
+```
+
+
+## Bridge symptoms and communities graph
+```{r}
+#plot the graph that shows the bridge symptoms and the communities:
+
+pdf("dep 1 Theoretical Communities Bridge Expected Influence Nodes Graph test.pdf")
+plotgraph <- plot(network1, 
+     layout="spring", 
+     groups=new_communitiesdep, 
+     color=c("orange", "lightgreen", "lightblue", "pink", "red"), 
+     edge.labels=TRUE
+     )
+dev.off()
+```
+
+## Bootstrapping for edge weights
+```{r}
+# Non-parametric for edge weights
+
+# Name the file
+bootstrapFile2 <- "dep 1 casedropping Bootstrapped Centrality Indices List with communities (bootEW1).RData"
+
+# If you want to run bootstraps or load data (command in 1.1)
+if (runBootstraps) {
+  # Bootstrapping (non-parametric for edge weights)
+  bootEW1 <- bootnet(network1, nBoots = 1000, nCores = 8, statistics = "all", communities = c(rep("Mother",9), rep("Father",9)))
+  print(bootEW1)
+  # you need to specifically ask for the statistics you want to include (here we've used all), only then the following difference test works. 
+  # to calculate the bridge indices (e.g.bridgeExpectedInfluence), you need to specify the communities.
+  save(bootEW1, file = bootstrapFile2) 
+} else {
+  load(bootstrapFile2)
+}
+```
+
+
+## Edge weight accuracy
+```{r}
+#Estimate the accuracy of edge-weights:
+pdf("dep 1 edge accuracy bootEW1 communities specified.pdf",height = 20,width = 7)
+plot(bootEW1, 
+     split0=TRUE, 
+     plot="interval", 
+     order="sample")  
+dev.off()
+
+print(bootEW1) 
+
+bootEW1$sampleTable 
+export(bootEW1$sampleTable,"Dep 1 Individual Edge Values in the Sample and their rankings dep.csv")
+
+# call the number of non-zero edges and the mean weight for each bootstrap graph (out of 1000)
+bootEW1$boots 
+# call the individual edge weights from ALL bootstrap samples (out of 1000)
+bootEW1$bootTable 
+# inspect summarized statistics (see ?summary.bootnet for details)
+bootEW1sum <- summary(bootEW1) 
+
+export(bootEW1sum,"dep 1 Summary Statistics of nonparametric Bootstrap Results.csv")
+```
+
+## Difference tests
+
+```{r}
+#Perform bootstrapped difference tests between edge-weights and centrality indices, to test whether these differ significantly from each other
+
+pdf("dep 1 edge difference test EW1.pdf",height = 10,width = 7)
+plot(bootEW1, 
+     plot="difference", 
+     onlyNonZero = TRUE, 
+     order = "mean") 
+#only plots significant differences. 
+dev.off()
+
+pdf("dep 1 strength difference test EW1.pdf",height = 10,width = 7)
+
+#compare node strength
+plot(bootEW1, 
+     "strength", 
+     order="mean") 
+dev.off()
+
+pdf("dep 1 bridge strength difference test EW1.pdf",height = 10,width = 7)
+plot(bootEW1,
+     "bridgeStrength", 
+     order= "mean", 
+     plot = "difference")
+dev.off()
+```
+
+## Global connectivity
+```{r}
+# compute global connectivity
+sum(abs(network1$graph))/2
+```
+
+# 4. Step-2 plus child outcome
+
+## Select symptoms
+```{r}
+# add child outcome
+df.dep2 <- df.data %>%
+  select(starts_with("m_"), starts_with("d_"), "emotional_symptoms")
+```
+
+```{r}
+# run the model (significant edges only)
+network2 <- estimateNetwork(df.dep2,
+                            default = "ggmModSelect", 
+                            corMethod ="cor", 
+                            corArgs = list(method = "spearman"),
+                            stepwise = TRUE,
+                            sig = "0.05")
+# plot the graph for step 2
+pdf("dep 2 network with correlations.pdf")
+depgr2 <- plot(network2,
+               edge.labels=TRUE) 
+
+print(network2)
+```
+
+```{r}
+# run the model (including significant and non-significant edges)
+network2all <- estimateNetwork(df.dep, 
+                            default = "ggmModSelect", 
+                            corMethod ="cor", 
+                            corArgs = list(method = "spearman"),
+                            stepwise = TRUE
+                            )
+# plot the graph for step 2
+pdf("dep 2 network with correlations and all edges.pdf")
+depgr <- plot(network2all, 
+              edge.labels=TRUE) 
+```
+
+## Centrality indices
+```{r}
+# Investigate the stability of centrality indices: these are case-dropping subset bootstraps
+
+# Name the file
+bootstrapFile3 <- "dep 2 casedropping Bootstrapped Centrality Indices List with communities (bootCI2).RData"
+
+# If you want to run bootstraps or load data (command in 1.1)
+if (runBootstraps) {
+  # If bridge statistics are to be bootstrapped, the communities argument should be provided
+  bootCI2 <- bootnet(network2, nBoots = 1000, type = "case", nCores = 8, statistics="all", communities = c(rep("Mother",9), rep("Father",9), rep("Child outcome",1)))
+  # save the bootstrap results to be able to use them in the future
+    save(bootCI2, file = bootstrapFile3) 
+} else {
+  # load the bootstrap results back using this command when already run.
+  load("dep 2 casedropping Bootstrapped Centrality Indices List with communities (bootCI2).RData")
+}
+
+stability_dep2 <- corStability(bootCI2) 
+stability_dep2
+
+pdf("dep 2 stability full index.pdf")
+plot(bootCI2, 
+     statistics = c("strength",  "closeness", "betweenness", "expectedInfluence")) 
+
+pdf("dep 2 centrality for interpretation 0.25.pdf", width = 7.5)
+Centralitydep2 <- centrality(network2, all.shortest.paths = TRUE)
+centralityPlot(network2,
+               scale = c("raw0"),
+               include = c("Strength", "Closeness", "Betweenness"),
+               orderBy="Strength")
+
+# Raw strength centrality
+CentValues <- round(centrality(network2)$OutDegree,2)
+write.table(CentValues, file="dep 2 CentValues.csv", col.names = FALSE)
+
+# Standardized strength centrality
+Strengthstan <- centralityPlot(network2)
+StrengthstanTable <- Strengthstan$data[,c(3,5)]
+StrengthstanTable[,2] <- round(StrengthstanTable[,2],2)
+write.table(StrengthstanTable, file="dep 2 CentValuesstan.csv", row.names=FALSE)
+```
+
+## Bridge centrality indices
+```{r}
+Bridge_SS2 = bridge(depgr2, communities=c( "1", "1", "1", "1", "1", "1", "1", "1", "1", "2", "2", "2", "2", "2", "2", "2", "2", "2", "3"), 
+                   useCommunities = "all",
+                   directed = NULL, nodes = NULL)
+summary(Bridge_SS2)
+
+# pdf("dep 2 Bridge centrality for interpretation 0.25.pdf", width = 7)
+# Not using bridges in network 2
+plot(Bridge_SS2, 
+     include=c("Bridge Strength", "Bridge Betweenness"),
+     order="value", 
+     zscore=TRUE)
+dev.off()
+
+# plot graph in a way that the nodes are colored according to their Bridge Centrality Indices
+community_structuredep2 <- c(rep("Mother", 9), rep("Father", 9), rep("Child outcome", 1))
+
+bridge_centralitydep2 <- bridge(network2$graph, communities = community_structuredep2)
+bridge_centralitydep2
+save(bridge_centralitydep2, file="dep 2 Bridge Centrality Values.csv")
+
+# detect the top scoring nodes on bridge expected influence centrality index 
+bridge_expinf_dep2 <- bridge_centralitydep2$`Bridge Expected Influence (1-step)`
+
+# set threshold for top scoring
+top_bridgesdep2 <- names(bridge_expinf_dep2[bridge_expinf_dep2 > quantile(bridge_expinf_dep2, probs=0.99, na.rm=TRUE)])
+
+bridge_num_2 <- which(names(bridge_expinf_dep2) %in% top_bridgesdep2)
+new_communitiesdep2 <- vector()
+for(i in 1:length(bridge_expinf_dep2)) {
+  if(i %in% bridge_num_2) {
+    new_communitiesdep2[i] <- "Bridge"
+  } else {new_communitiesdep2[i] <- community_structuredep2[i]}
+}
+```
+
+## Bridge symptoms and communities graph
+```{r}
+#plot the graph that shows the bridge symptoms and the communities:
+pdf("dep 2 Theoretical Communities Bridge Expected Influence Nodes Graph.pdf")
+plot(network2, 
+     layout="spring", 
+     groups=new_communitiesdep2,
+     color=c("pink", "lightgreen", "lightblue", "pink", "red"),
+     edge.labels=FALSE
+     #, edge.label.cex=0.8
+     )
+dev.off()
+```
+
+
+## Bootstrapping for edge weights
+```{r}
+# Non-parametric for edge weights
+
+bootstrapFile4 <- "dep 2 casedropping Bootstrapped Centrality Indices List with communities (bootEW2).RData"
+
+# If you want to run bootstraps or load data (command in 1.1)
+if (runBootstraps) {
+  # Bootstrapping (non-parametric for edge weights)
+  bootEW2 <- bootnet(network2, nBoots = 1000, nCores = 8, statistics = "all", communities = c(rep("Mother", 9), rep("Father", 9), rep("Child outcome", 1)))
+  print(bootEW2)
+  
+  save(bootEW2, file=bootstrapFile4) 
+} else {
+  # load(bootstrapFile4)
+  load("dep 2 casedropping Bootstrapped Centrality Indices List with communities (bootEW2).RData")
+}
+```
+
+
+## Edge weight accuracy
+```{r}
+pdf("dep 2 edge accuracy bootEW2 communities specified.pdf", height = 20, width = 7)
+plot(bootEW2,
+     split0=TRUE,
+     plot="interval",
+     order="sample")  
+dev.off()
+
+print(bootEW2) 
+
+bootEW2$sampleTable 
+export(bootEW2$sampleTable,"Dep 2 Individual Edge Values in the Sample and their rankings dep2.csv")
+
+bootEW2$boots #this gives the number of non-zero edges and the mean weight for each bootstrap graph (out of 1000)
+bootEW2$bootTable # this gives the individual edge weights from ALL bootstrap samples (out of 1000)
+bootEW2sum <- summary(bootEW2) # to inspect summarized statistics (see ?summary.bootnet for details)
+export(bootEW2sum,"dep 2 Summary Statistics of nonparametric Bootstrap Results.csv")
+```
+
+## Difference tests
+
+```{r}
+#Perform bootstrapped difference tests between edge-weights and centrality indices, to test whether these differ significantly from each other
+
+pdf("dep 2 edge difference test EW2.pdf",height = 10,width = 7)
+plot(bootEW2,
+     plot="difference", 
+     onlyNonZero = TRUE,
+     order = "mean") 
+#only plots significant differences. 
+dev.off()
+
+pdf("dep 2 strength difference test EW2.pdf",height = 10,width = 7)
+#code for comparing node strength,no need to specify the plot argument as it is set to the "difference" by default when the statistic is a centrality index.
+plot(bootEW1, 
+     "strength", 
+     order="mean") 
+dev.off()
+
+pdf("dep 2 bridge strength difference test EW2.pdf",height = 10,width = 7)
+plot(bootEW2,
+     "bridgeStrength", 
+     order= "mean", 
+     plot = "difference")
+dev.off()
+```
+
+## Global connectivity
+```{r}
+# compute global connectivity
+sum(abs(network2$graph))/2
+```
+
+# 5. Graphs
+```{r}
+# Make graphs visually comparable
+# Run this after creating the risk graph in the second step
+# This determines the maximother value of the edges in both graphs, takes the highest value and scales the edges in both graphs.
+max <- max(abs(network1$graph),abs(network2$graph))  
+
+#depgr<-plot(graph,edge.labels=TRUE,maximother= max) 
+#use the maximother to make the graphs comparable.
+#You will need to have computed both graphs before you can determine the maximother value.So delete maximother=max argument if you only computed one network.
+
+## Bridge symptoms and communities graphs
+
+#plot the graph that shows the bridge symptoms and the communities:
+pdf("dep 1 Theoretical Communities Bridge Expected Influence Nodes Graph max.pdf")
+plot(network1, 
+     layout="spring", 
+     groups=new_communitiesdep, 
+     color=c("orange", "lightgreen", "lightblue", "pink", "red"),
+     maximother = max,
+     edge.labels=FALSE
+     #, edge.label.cex=0.8
+     )
+dev.off()
+
+#plot the graph that shows the bridge symptoms and the communities:
+pdf("dep 2 Theoretical Communities Bridge Expected Influence Nodes Graph max.pdf")
+plot(network2, 
+     layout="spring", 
+     groups=new_communitiesdep2,
+     color=c("pink", "lightgreen", "lightblue", "pink", "red"),
+     maximother = max,
+     edge.labels=FALSE
+     #, edge.label.cex=0.8
+     )
+dev.off()
+
+```
+
+# 6. Replicability
+
+Split half tests for network 1
+```{r, eval = F}
+# delete any rows with NAs
+df.depNA <- na.omit(df.dep)
+
+# Split data in half at random by creating a dummy indicator
+set.seed(3645)                           
+dummy_split <- rbinom(nrow(df.depNA), 1, 0.5)
+dataSplit1 <- df.depNA[dummy_split == 0, ]
+dataSplit2 <- df.depNA[dummy_split == 1, ]
+
+# network comparisons tests
+res <- NCT(dataSplit1, dataSplit2, 
+           it = 10000, weighted = TRUE, 
+           test.edges = TRUE, 
+           progressbar = TRUE, 
+           test.centrality = TRUE, centrality=c("strength","closeness", "betweenness"), nodes="all")
+
+
+print(res)
+pdf("dep 1 replication 10k perms network graph.pdf")
+plot(res, what = "network")
+dev.off()
+pdf("dep 1 replication 10k perms strength graph.pdf")
+plot(res, what = "strength")
+dev.off()
+```
+
+
+Split half tests for network 2
+```{r, eval = F}
+# delete any rows with NAs
+df.dep2NA <- na.omit(df.dep2)
+
+# Split data in half at random by creating a dummy indicator
+set.seed(2473)                           
+dummy_split <- rbinom(nrow(df.dep2NA), 1, 0.5)
+dataSplit1 <- df.dep2NA[dummy_split == 0, ]
+dataSplit2 <- df.dep2NA[dummy_split == 1, ]
+
+# network comparisons tests
+res <- NCT(dataSplit1, dataSplit2, 
+           it = 10000, weighted = TRUE, 
+           test.edges = TRUE, 
+           progressbar = TRUE, 
+           test.centrality = TRUE, centrality=c("strength","closeness", "betweenness"), nodes="all")
+
+
+print(res)
+pdf("dep 2 replication 10k perms network graph.pdf")
+plot(res, what = "network")
+dev.off()
+pdf("dep 2 replication 10k perms strength graph.pdf")
+plot(res, what = "strength")
+dev.off()
+```
+
+# 7. Model 1 sensitivity
+
+## Select symptoms
+```{r}
+# only select the nodes you want to include for step 1 (depression symptoms between parents plus covariates)
+df.dep4 <- df.paper2.complete %>%
+  select("m_anhedonia", "m_guilt", "m_worry", "m_panic", "m_overwhelm", "m_insomnia", "m_sadness", "m_crying", "m_harmIdeas", "d_anhedonia", "d_guilt", "d_worry", "d_panic", "d_overwhelm", "d_insomnia", "d_sadness", "d_crying", "d_harmIdeas", "houseSC", "kz021",)
+```
+
+```{r}
+# run the model (significant edges only)
+network4 <- estimateNetwork(df.dep4, 
+                            default = "ggmModSelect", 
+                            corMethod ="cor", 
+                            corArgs = list(method = "spearman"),
+                            stepwise = TRUE,
+                            sig = "0.05"
+                            )
+# plot the graph for step 1
+pdf("dep4 network with correlations")
+depgr4 <- plot(network4, 
+              edge.labels=TRUE) 
+print(network4)
+```
+
+## Centrality indices
+```{r}
+# Investigate the stability of centrality indices: these are case-dropping subset bootstraps
+
+# Name the file
+bootstrapFile4 <- "dep 4 casedropping Bootstrapped Centrality Indices List with communities.RData"
+
+# If you want to run bootstraps or load data (command in 1.1)
+if (runBootstraps) {
+  # If bridge statistics are to be bootstrapped, the communities argument should be provided
+  bootCI4 <- bootnet(network4, nBoots = 1000, type = "case", nCores = 8, statistics="all", communities = c(rep("Mother",9), rep("Father",9), rep("Covariates", 2)))
+  # save the bootstrap results to be able to use them in the future without having to run it for hours again.
+  save(bootCI4, file = bootstrapFile4) 
+} else {
+  # load the bootstrap results back when the bootstrap data is already saved.
+  load(bootstrapFile4)
+}
+
+stability_dep4 <- corStability(bootCI4) 
+stability_dep4
+
+pdf("dep 4 stability full index.pdf")
+plot(bootCI4, 
+     statistics = c("strength",  "closeness", "betweenness", "expectedInfluence", "bridgeStrength",  "bridgeCloseness", "bridgeBetweenness", "bridgeExpectedInfluence")) 
+
+# only report and interpret those which meet the stability criteria
+pdf("dep 4 centrality for interpretation 0.25.pdf", width = 7)
+Centralitydep <- centrality(network4, all.shortest.paths = TRUE)
+centralityPlot(network4, 
+               scale = c("raw0"),
+               include = c("Strength", "Betweenness"), 
+               orderBy="Strength")
+
+# Raw strength centrality
+CentValues <- round(centrality(network4)$OutDegree,2)
+write.table(CentValues, file="dep 4 CentValues.csv", col.names = FALSE)
+
+# Standardized strength centrality
+Strengthstan <- centralityPlot(network4)
+StrengthstanTable <- Strengthstan$data[,c(3,5)]
+StrengthstanTable[,2] <- round(StrengthstanTable[,2],2)
+write.table(StrengthstanTable, file="dep 4 CentValuesstan.csv", row.names=FALSE)
+```
+
+
+## Bridge centrality indices
+```{r}
+Bridge_SS4 = bridge(depgr4, communities=c( "1", "1", "1", "1", "1", "1", "1", "1", "1", "2", "2", "2", "2", "2", "2", "2", "2", "2", "3", "3"), 
+                   useCommunities = "all",
+                   directed = NULL, nodes = NULL)
+summary(Bridge_SS4)
+
+# only report and interpret those which meet the stability criteria
+pdf("dep 4 bridge centrality for interpretation 0.25.pdf", width = 5.5)
+plot(Bridge_SS4, 
+     include = c("Bridge Strength", "Bridge Betweenness"), 
+     order="value", 
+     zscore=FALSE)
+dev.off()
+
+# plot graph in a way that the nodes are colored according to their Bridge Centrality Indices
+community_structuredep4 <- c(rep("Mother", 9), rep("Father", 9), rep("Covariates", 2))
+
+bridge_centralitydep4 <- bridge(network4$graph, communities = community_structuredep4)
+bridge_centralitydep4
+save(bridge_centralitydep4,file = "dep 4 Bridge Centrality Values.csv")
+
+# detect the top x% scoring nodes on bridge expected influence centrality index 
+bridge_expinf_dep4 <- bridge_centralitydep4$`Bridge Expected Influence (1-step)`
+
+# set threshold for bridges
+top_bridgesdep4 <- names(bridge_expinf_dep4[bridge_expinf_dep4 > quantile(bridge_expinf_dep4, probs=0.70, na.rm=TRUE)])
+
+bridge_num_4 <- which(names(bridge_expinf_dep4) %in% top_bridgesdep4)
+new_communitiesdep4 <- vector()
+for(i in 1:length(bridge_expinf_dep4)) {
+  if(i %in% bridge_num_4) {
+    new_communitiesdep4[i] <- "Bridge"
+  } else {new_communitiesdep4[i] <- community_structuredep4[i]}
+}
+```
+
+
+## Bridge symptoms and communities graph
+```{r}
+#plot the graph that shows the bridge symptoms and the communities:
+
+pdf("dep 4 Theoretical Communities Bridge Expected Influence Nodes Graph test.pdf")
+plotgraph <- plot(network4, 
+     layout="spring", 
+     groups=new_communitiesdep4, 
+     color=c("orange", "lightgreen", "lightblue", "pink", "red"), 
+     edge.labels=TRUE
+     )
+dev.off()
+```
+
+# 8. Model 2 sensitivity
+
+## Select symptoms
+```{r}
+# only select the nodes you want to include for step 1 (depression symptoms between parents plus covariates)
+df.dep5 <- df.paper2.complete %>%
+  select("m_anhedonia", "m_guilt", "m_worry", "m_panic", "m_overwhelm", "m_insomnia", "m_sadness", "m_crying", "m_harmIdeas", "d_anhedonia", "d_guilt", "d_worry", "d_panic", "d_overwhelm", "d_insomnia", "d_sadness", "d_crying", "d_harmIdeas", "houseSC", "kz021", "emotional_symptoms")
+```
+
+```{r}
+# run the model (significant edges only)
+network5 <- estimateNetwork(df.dep5, 
+                            default = "ggmModSelect", 
+                            corMethod ="cor", 
+                            corArgs = list(method = "spearman"),
+                            stepwise = TRUE,
+                            sig = "0.05"
+                            )
+# plot the graph for step 1
+pdf("dep5 network with correlations")
+depgr5 <- plot(network5, 
+              edge.labels=TRUE) 
+print(network5)
+```
+
+## Centrality indices
+```{r}
+# Investigate the stability of centrality indices: these are case-dropping subset bootstraps
+
+# Name the file
+bootstrapFile5 <- "dep 5 casedropping Bootstrapped Centrality Indices List with communities.RData"
+
+# If you want to run bootstraps or load data (command in 1.1)
+if (runBootstraps) {
+  # If bridge statistics are to be bootstrapped, the communities argument should be provided
+  bootCI5 <- bootnet(network5, nBoots = 1000, type = "case", nCores = 8, statistics="all", communities = c(rep("Mother",9), rep("Father",9), rep("Covariates", 2), rep("emotional_symptoms", 1)))
+  # save the bootstrap results to be able to use them in the future without having to run it for hours again.
+  save(bootCI5, file = bootstrapFile5) 
+} else {
+  # load the bootstrap results back when the bootstrap data is already saved.
+  load(bootstrapFile5)
+}
+
+stability_dep5 <- corStability(bootCI5) 
+stability_dep5
+
+pdf("dep 5 stability full index.pdf")
+plot(bootCI5, 
+     statistics = c("strength",  "closeness", "betweenness", "expectedInfluence", "bridgeStrength",  "bridgeCloseness", "bridgeBetweenness", "bridgeExpectedInfluence")) 
+
+# only report and interpret those which meet the stability criteria
+pdf("dep 5 centrality for interpretation 0.25.pdf", width = 7)
+Centralitydep <- centrality(network5, all.shortest.paths = TRUE)
+centralityPlot(network5, 
+               scale = c("raw0"),
+               include = c("Strength", "Betweenness"), 
+               orderBy="Strength")
+
+# Raw strength centrality
+CentValues <- round(centrality(network5)$OutDegree,2)
+write.table(CentValues, file="dep 5 CentValues.csv", col.names = FALSE)
+
+# Standardized strength centrality
+Strengthstan <- centralityPlot(network5)
+StrengthstanTable <- Strengthstan$data[,c(3,5)]
+StrengthstanTable[,2] <- round(StrengthstanTable[,2],2)
+write.table(StrengthstanTable, file="dep 5 CentValuesstan.csv", row.names=FALSE)
+```
+
+
+## Bridge centrality indices
+```{r}
+Bridge_SS5 = bridge(depgr5, communities=c( "1", "1", "1", "1", "1", "1", "1", "1", "1", "2", "2", "2", "2", "2", "2", "2", "2", "2", "3", "3", "4"), 
+                   useCommunities = "all",
+                   directed = NULL, nodes = NULL)
+summary(Bridge_SS5)
+
+# only report and interpret those which meet the stability criteria
+pdf("dep 5 bridge centrality for interpretation 0.25.pdf", width = 5.5)
+plot(Bridge_SS5, 
+     include = c("Bridge Strength", "Bridge Betweenness"), 
+     order="value", 
+     zscore=FALSE)
+dev.off()
+
+# plot graph in a way that the nodes are colored according to their Bridge Centrality Indices
+community_structuredep5 <- c(rep("Mother", 9), rep("Father", 9), rep("Covariates", 2), rep("emotional_symptoms", 1))
+
+bridge_centralitydep5 <- bridge(network5$graph, communities = community_structuredep5)
+bridge_centralitydep5
+save(bridge_centralitydep5,file = "dep 5 Bridge Centrality Values.csv")
+
+# detect the top x% scoring nodes on bridge expected influence centrality index 
+bridge_expinf_dep5 <- bridge_centralitydep5$`Bridge Expected Influence (1-step)`
+
+# set threshold for bridges
+top_bridgesdep5 <- names(bridge_expinf_dep5[bridge_expinf_dep5 > quantile(bridge_expinf_dep5, probs=1, na.rm=TRUE)])
+
+bridge_num_5 <- which(names(bridge_expinf_dep5) %in% top_bridgesdep5)
+new_communitiesdep5 <- vector()
+for(i in 1:length(bridge_expinf_dep5)) {
+  if(i %in% bridge_num_5) {
+    new_communitiesdep5[i] <- "Bridge"
+  } else {new_communitiesdep5[i] <- community_structuredep5[i]}
+}
+```
+
+
+## Bridge symptoms and communities graph
+```{r}
+#plot the graph that shows the bridge symptoms and the communities:
+
+pdf("dep 5 Theoretical Communities Bridge Expected Influence Nodes Graph.pdf")
+plotgraph <- plot(network5, 
+     layout="spring", 
+     groups=new_communitiesdep5, 
+     color=c("lightgreen", "red", "lightblue", "pink"), 
+     edge.labels=TRUE
+     )
+dev.off()
+```
