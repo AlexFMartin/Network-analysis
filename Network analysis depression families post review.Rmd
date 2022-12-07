@@ -5,7 +5,7 @@ date: "02/09/2022"
 output: html_document
 ---
 
-This version includes changes requested by reviewers at the British Journal of Psychiatry.
+This version includes changes requested by reviewers at the British Journal of Psychiatry (round one and round two).
 
 R Markdown
 
@@ -490,8 +490,7 @@ network3 <- estimateNetwork(df.dep3,
                             default = "ggmModSelect", 
                             corMethod ="cor", 
                             corArgs = list(method = "spearman"),
-                            stepwise = TRUE,
-                            sig = "0.05")
+                            stepwise = TRUE)
 # plot the graph
 depgr3 <- plot(network3,
                edge.labels=TRUE) 
@@ -520,14 +519,14 @@ stability_dep3
 
 pdf("dep all vars stability full index.pdf")
 plot(bootCI3, 
-     statistics = c("strength",  "closeness", "betweenness", "expectedInfluence", "bridgeStrength",  "bridgeCloseness", "bridgeBetweenness", "bridgeExpectedInfluence")) 
+     statistics = c("strength",  "bridgeStrength", "bridgeExpectedInfluence")) 
 
 
 pdf("dep all vars centrality for interpretation.pdf")
 Centralitydep3 <- centrality(network3, all.shortest.paths = TRUE)
 centralityPlot(network3,
                scale = c("raw0"),
-               include = c("Strength", "Closeness"),
+               include = c("Strength"),
                orderBy="Strength")
 
 # Raw strength centrality
@@ -550,7 +549,7 @@ summary(Bridge_SS3)
 
 pdf("dep all vars Bridge centrality for interpretation.pdf", width = 8)
 plot(Bridge_SS3, 
-     include=c("Bridge Strength", "Bridge Closeness"),
+     include=c("Bridge Strength"),
      order="value", 
      zscore=TRUE)
 dev.off()
@@ -604,8 +603,7 @@ network1 <- estimateNetwork(df.dep,
                             default = "ggmModSelect", 
                             corMethod ="cor", 
                             corArgs = list(method = "spearman"),
-                            stepwise = TRUE,
-                            sig = "0.05"
+                            stepwise = TRUE
                             )
 
 # plot the graph for step 1
@@ -638,8 +636,7 @@ network1 <- estimateNetwork(df.data,
                             default = "ggmModSelect", 
                             corMethod ="cor", 
                             corArgs = list(method = "spearman"),
-                            stepwise = TRUE,
-                            sig = "0.05"
+                            stepwise = TRUE
                             )
 
 # plot the graph for step 1
@@ -922,8 +919,7 @@ network1 <- estimateNetwork(df.dep,
                             default = "ggmModSelect", 
                             corMethod ="cor", 
                             corArgs = list(method = "spearman"),
-                            stepwise = TRUE,
-                            sig = "0.05"
+                            stepwise = TRUE
                             )
 # plot the graph for step 1
 depgr <- plot(network1, 
@@ -968,14 +964,14 @@ stability_dep1
 
 pdf("dep 1 stability full index.pdf")
 plot(bootCI1, 
-     statistics = c("strength",  "closeness", "betweenness", "expectedInfluence", "bridgeStrength",  "bridgeCloseness", "bridgeBetweenness", "bridgeExpectedInfluence")) 
+     statistics = c("strength", "bridgeStrength", "bridgeExpectedInfluence")) 
 
 # only report and interpret those which meet the stability criteria
-pdf("dep 1 centrality for interpretation 0.25.pdf", width = 7)
+pdf("dep 1 centrality for interpretation 0.25.pdf", width = 4)
 Centralitydep <- centrality(network1, all.shortest.paths = TRUE)
 centralityPlot(network1, 
                scale = c("raw0"),
-               include = c("Strength", "Closeness", "Betweenness"), 
+               include = c("Strength"), 
                orderBy="Strength")
 
 # Raw strength centrality
@@ -998,9 +994,9 @@ Bridge_SS = bridge(depgr, communities=c( "1", "1", "1", "1", "1", "1", "1", "1",
 summary(Bridge_SS)
 
 # only report and interpret those which meet the stability criteria
-pdf("dep 1 bridge centrality for interpretation 0.25.pdf", width = 5.5)
+pdf("dep 1 bridge centrality for interpretation 0.25.pdf", width = 5)
 plot(Bridge_SS, 
-     include = c("Bridge Strength", "Bridge Betweenness"), 
+     include = c("Bridge Strength"), 
      order="value", 
      zscore=FALSE)
 dev.off()
@@ -1137,8 +1133,8 @@ network2 <- estimateNetwork(df.dep2,
                             default = "ggmModSelect", 
                             corMethod ="cor", 
                             corArgs = list(method = "spearman"),
-                            stepwise = TRUE,
-                            sig = "0.05")
+                            stepwise = TRUE
+                            )
 # plot the graph for step 2
 pdf("dep 2 network with correlations.pdf")
 depgr2 <- plot(network2,
@@ -1148,7 +1144,7 @@ print(network2)
 ```
 
 ```{r}
-# run the model (including significant and non-significant edges)
+# run the model (including partial correlation stats)
 network2all <- estimateNetwork(df.dep, 
                             default = "ggmModSelect", 
                             corMethod ="cor", 
@@ -1184,13 +1180,13 @@ stability_dep2
 
 pdf("dep 2 stability full index.pdf")
 plot(bootCI2, 
-     statistics = c("strength",  "closeness", "betweenness", "expectedInfluence")) 
+     statistics = c("strength")) 
 
 pdf("dep 2 centrality for interpretation 0.25.pdf", width = 7.5)
 Centralitydep2 <- centrality(network2, all.shortest.paths = TRUE)
 centralityPlot(network2,
                scale = c("raw0"),
-               include = c("Strength", "Closeness", "Betweenness"),
+               include = c("Strength"),
                orderBy="Strength")
 
 # Raw strength centrality
@@ -1214,7 +1210,7 @@ summary(Bridge_SS2)
 # pdf("dep 2 Bridge centrality for interpretation 0.25.pdf", width = 7)
 # Not using bridges in network 2
 plot(Bridge_SS2, 
-     include=c("Bridge Strength", "Bridge Betweenness"),
+     include=c("Bridge Strength"),
      order="value", 
      zscore=TRUE)
 dev.off()
@@ -1443,8 +1439,7 @@ network4 <- estimateNetwork(df.dep4,
                             default = "ggmModSelect", 
                             corMethod ="cor", 
                             corArgs = list(method = "spearman"),
-                            stepwise = TRUE,
-                            sig = "0.05"
+                            stepwise = TRUE
                             )
 # plot the graph for step 1
 pdf("dep4 network with correlations")
@@ -1476,14 +1471,14 @@ stability_dep4
 
 pdf("dep 4 stability full index.pdf")
 plot(bootCI4, 
-     statistics = c("strength",  "closeness", "betweenness", "expectedInfluence", "bridgeStrength",  "bridgeCloseness", "bridgeBetweenness", "bridgeExpectedInfluence")) 
+     statistics = c("strength", "bridgeStrength", "bridgeExpectedInfluence")) 
 
 # only report and interpret those which meet the stability criteria
 pdf("dep 4 centrality for interpretation 0.25.pdf", width = 7)
 Centralitydep <- centrality(network4, all.shortest.paths = TRUE)
 centralityPlot(network4, 
                scale = c("raw0"),
-               include = c("Strength", "Betweenness"), 
+               include = c("Strength"), 
                orderBy="Strength")
 
 # Raw strength centrality
@@ -1508,7 +1503,7 @@ summary(Bridge_SS4)
 # only report and interpret those which meet the stability criteria
 pdf("dep 4 bridge centrality for interpretation 0.25.pdf", width = 5.5)
 plot(Bridge_SS4, 
-     include = c("Bridge Strength", "Bridge Betweenness"), 
+     include = c("Bridge Strength"), 
      order="value", 
      zscore=FALSE)
 dev.off()
@@ -1565,8 +1560,7 @@ network5 <- estimateNetwork(df.dep5,
                             default = "ggmModSelect", 
                             corMethod ="cor", 
                             corArgs = list(method = "spearman"),
-                            stepwise = TRUE,
-                            sig = "0.05"
+                            stepwise = TRUE
                             )
 # plot the graph for step 1
 pdf("dep5 network with correlations")
@@ -1598,14 +1592,14 @@ stability_dep5
 
 pdf("dep 5 stability full index.pdf")
 plot(bootCI5, 
-     statistics = c("strength",  "closeness", "betweenness", "expectedInfluence", "bridgeStrength",  "bridgeCloseness", "bridgeBetweenness", "bridgeExpectedInfluence")) 
+     statistics = c("strength", "bridgeStrength", "bridgeExpectedInfluence")) 
 
 # only report and interpret those which meet the stability criteria
 pdf("dep 5 centrality for interpretation 0.25.pdf", width = 7)
 Centralitydep <- centrality(network5, all.shortest.paths = TRUE)
 centralityPlot(network5, 
                scale = c("raw0"),
-               include = c("Strength", "Betweenness"), 
+               include = c("Strength"), 
                orderBy="Strength")
 
 # Raw strength centrality
@@ -1630,7 +1624,7 @@ summary(Bridge_SS5)
 # only report and interpret those which meet the stability criteria
 pdf("dep 5 bridge centrality for interpretation 0.25.pdf", width = 5.5)
 plot(Bridge_SS5, 
-     include = c("Bridge Strength", "Bridge Betweenness"), 
+     include = c("Bridge Strength"), 
      order="value", 
      zscore=FALSE)
 dev.off()
